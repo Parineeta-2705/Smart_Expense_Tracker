@@ -1,0 +1,39 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Smart Expense Tracker</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><div class="brand">◈ Smart Expense Tracker</div><nav><button id="tab-dash" class="active">Dashboard</button><button id="tab-txn">Transactions</button></nav></header>
+<main>
+<section id="view-dash"><h2>Dashboard <span style="font-size:12px;color:#7a8f9b;font-weight:400">· October 2026</span></h2>
+ <div class="grid">
+  <div class="card"><h3>Budget Health Score</h3><button class="refresh" onclick="render()">Refresh</button><div class="chart-box"><canvas id="c-score"></canvas><div class="score" id="score-text"></div></div></div>
+  <div class="card"><h3>Category Budget Status</h3><div class="chart-box"><canvas id="c-status"></canvas></div></div>
+  <div class="card"><h3>Needs vs Wants Spending</h3><div class="chart-box"><canvas id="c-split"></canvas></div></div>
+  <div class="card"><h3>Reminders &amp; Alerts</h3><div class="alerts"><ul id="alerts"></ul><h4>Tips</h4><ul><li class="tip">Review recurring subscriptions every month</li><li class="tip">Keep Wants below 30% of total spending</li></ul></div></div>
+ </div></section>
+<section id="view-txn" style="display:none"><h2>Transactions</h2><button class="add">Add Expense</button>
+ <table><thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th>Amount</th><th>Type</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table></section>
+</main>
+<script src="chart.umd.js"></script><script src="data.js"></script><script src="analytics.js"></script>
+<script>
+Chart.defaults.color="#9fb4c0";Chart.defaults.font.size=11;
+let charts=[];
+function render(){
+  charts.forEach(c=>c.destroy());charts=[];
+  const m=evaluateDashboardMetrics(TXNS,BUDGETS);
+  document.getElementById("score-text").textContent=m.budget_health_score+"%";
+  charts.push(new Chart("c-score",{type:"doughnut",data:{datasets:[{data:[m.budget_health_score,100-m.budget_health_score],backgroundColor:["#19c3b5","#26303a"],borderWidth:0}]},options:{cutout:"68%",plugins:{legend:{display:false},tooltip:{enabled:false}},maintainAspectRatio:false}}));
+  const s=m.status_distribution;
+  charts.push(new Chart("c-status",{type:"bar",data:{labels:["Safe","Near Limit","Over Budget"],datasets:[{data:[s.Safe,s.Near,s.Over],backgroundColor:["#1fd35f","#e9a21b","#e0463d"],borderRadius:3}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:2},grid:{color:"#1a2a33"}},x:{grid:{display:false}}},maintainAspectRatio:false}}));
+  charts.push(new Chart("c-split",{type:"pie",data:{labels:["Needs","Wants"],datasets:[{data:[m.needs,m.wants],backgroundColor:["#19c3b5","#ff7a45"],borderColor:"#0f1a22",borderWidth:2}]},options:{plugins:{legend:{position:"bottom",labels:{boxWidth:10}}},maintainAspectRatio:false}}));
+  document.getElementById("alerts").innerHTML=m.alerts.map(a=>`<li>${a}</li>`).join("");
+}
+function rows(){
+  const dupKeys=new Set(findDuplicates(TXNS).map(d=>d.repeat.date+d.repeat.merchant));
+  const latest=[...TXNS].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,13);
+  document.getElementById("rows").innerHTML=latest.map(t=>{
+    const need=NEEDS.includes(t.category), dup=dupKeys.has(t.date+t.merchant);
+    return `<tr><td>${t.date}</td><td>${t.merchant}${dup?' <span class="badge dup">duplicate?</span>':''}</td><td>${t.category}</td><td class="amt">₹${t.amount.toLocaleString("en-IN")}</td><td><span class="badge ${need?'need':'want'}">${need?'need':'want'}</span></td><td><button class="btn edit">Edit</button><button class="btn rm">Remove</button></td></tr>`}).join("");
+}
+function show(v){["dash","txn"].forEach(x=>{document.getElementById("view-"+x).style.display=x===v?"":"none";document.getElementById("tab-"+x).classList.toggle("active",x===v)});}
+document.getElementById("tab-dash").onclick=()=>show("dash");document.getElementById("tab-txn").onclick=()=>show("txn");
+render();rows();
+</script></body></html>
